@@ -1,6 +1,9 @@
 #include <TinyGPS++.h>
 #include <SoftwareSerial.h>
+#include <SPI.h>
 #include <SD.h>
+#include <string>
+
 /*
    This sample sketch demonstrates the normal use of a TinyGPS++ (TinyGPSPlus) object.
    It requires the use of SoftwareSerial, and assumes that you have a
@@ -9,6 +12,7 @@
 
 static const int RXPin = 5, TXPin = 3;
 static const int SD_SS = 4;
+static const int led = 13;
 static const uint32_t GPSBaud = 9600;
 //unsigned long time; //Will overflow in 50 days!!
 
@@ -64,6 +68,9 @@ TinyGPSPlus gps;
 // The serial connection to the GPS device
 SoftwareSerial ss(RXPin, TXPin);
 
+char * filename;
+int filename_initialized = 0;
+
 void setup()
 {
   Serial.begin(115200);
@@ -74,7 +81,7 @@ void setup()
   Serial.print(F("Testing TinyGPS++ library v. ")); Serial.println(TinyGPSPlus::libraryVersion());
   Serial.println(F("by Mikal Hart"));
   Serial.println();
-  
+  pinMode(led, OUTPUT);
   setup_sd();
 }
 
@@ -84,10 +91,30 @@ void loop()
   while (ss.available() > 0) {
     if (gps.encode(ss.read())) {
       displayInfo();
-      myFile = SD.open("test3.txt", FILE_WRITE);  
+      //Serial.println(gps.time.value());
+        if(gps.time.isValid()) {
+          //digitalWrite(led, HIGH);
+          if(gps.time.isValid() && gps.time.value() != 0) {
+              digitalWrite(led, HIGH);
+          } else {
+             digitalWrite(led, LOW);
+          }
+        Serial.println("Time is valid and not zero.");
+        //Serial.println("test_file.log"_initialized);
+        String temp_fn;
+        if(!filename_initialized) { // "test_file.log" needs to be initialized
+          Serial.println("In the initialization loop");
+          //temp_fn = get_filename_string(gps);
+          //Serial.println(temp_fn);
+          //filename = (char *)malloc(sizeof(char)*(temp_fn.length() + 1));
+          //temp_fn.toCharArray(filename,256);
+          //filename_initialized = 1;
+        }
+        //Serial.println(temp_fn);
+      myFile = SD.open("test.log", FILE_WRITE);
   // if the file opened okay, write to it:
   if (myFile) {
-    Serial.print("Writing to test.txt...");
+    Serial.print("Writing to ");
     //myFile.println("testing 1, 2, 3.");
     write_to_sd();
     //myFile.println(displayInfo());
@@ -96,22 +123,22 @@ void loop()
     myFile.close();
   } else {
     // if the file didn't open, print an error:
-    Serial.println("error opening test.txt");
+    Serial.println("error opening ");
   }
   //read_from_sd();
+        }
     }
-  }
-  if (millis() > 5000 && gps.charsProcessed() < 10)
-  {
+    if (millis() > 5000 && gps.charsProcessed() < 10) {
     Serial.println(F("No GPS detected: check wiring."));
     while(true);
+    }
   }
 }
 
 void read_from_sd() {
-   myFile = SD.open("test3.txt");
+   myFile = SD.open("test.log");
   if (myFile) {
-    Serial.println("test.txt:");
+          Serial.println(":");
     
     // read from the file until there's nothing else in it:
     while (myFile.available()) {
@@ -121,12 +148,12 @@ void read_from_sd() {
     myFile.close();
   } else {
     // if the file didn't open, print an error:
-    Serial.println("error opening test.txt");
+    Serial.println("error opening ");
   } 
 }
 
 void write_to_sd() {
-    myFile.print(F("Location: ")); 
+    myFile.print(F("Location: "));
   if (gps.location.isValid())
   {
     myFile.print(gps.location.lat(), 6);
@@ -224,4 +251,8 @@ void displayInfo()
   }
 
   Serial.println();
+}
+
+String get_filename_string(TinyGPSPlus gps) {
+  return "df.log";
 }
