@@ -2,7 +2,7 @@
 #include <SoftwareSerial.h>
 #include <SPI.h>
 #include <SD.h>
-#include <string>
+//#include <string>
 
 /*
    This sample sketch demonstrates the normal use of a TinyGPS++ (TinyGPSPlus) object.
@@ -33,9 +33,9 @@ void setup_sd()
   // or the SD library functions will not work. 
    pinMode(10, OUTPUT);
    
-  if (!SD.begin(SD_SS)) {
-    Serial.println("initialization failed!");
-    return;
+  while(!SD.begin(SD_SS)) {
+    Serial.println("initialization failed!... waiting until SD card is inserted...");
+    delay(5000);
   }
   Serial.println("initialization done.");
   
@@ -68,21 +68,24 @@ TinyGPSPlus gps;
 // The serial connection to the GPS device
 SoftwareSerial ss(RXPin, TXPin);
 
-char * filename;
+char filename[40]; // 8/8/8/8.3\0
 int filename_initialized = 0;
+unsigned long start_time;
+boolean write_gpx = false;
 
 void setup()
 {
   Serial.begin(115200);
   ss.begin(GPSBaud);
 
-  Serial.println(F("DeviceExample.ino"));
-  Serial.println(F("A simple demonstration of TinyGPS++ with an attached GPS module"));
-  Serial.print(F("Testing TinyGPS++ library v. ")); Serial.println(TinyGPSPlus::libraryVersion());
-  Serial.println(F("by Mikal Hart"));
-  Serial.println();
+//  Serial.println(F("DeviceExample.ino"));
+//  Serial.println(F("A simple demonstration of TinyGPS++ with an attached GPS module"));
+//  Serial.print(F("Testing TinyGPS++ library v. ")); Serial.println(TinyGPSPlus::libraryVersion());
+//  Serial.println(F("by Mikal Hart"));
+//  Serial.println();
   pinMode(led, OUTPUT);
   setup_sd();
+  start_time = millis();
 }
 
 void loop()
@@ -91,44 +94,69 @@ void loop()
   while (ss.available() > 0) {
     if (gps.encode(ss.read())) {
       displayInfo();
-      //Serial.println(gps.time.value());
-        if(gps.time.isValid()) {
+      //Serial.println(gps.date.value());
+        if(gps.date.isValid() && gps.date.value() != 0) {
+          //jee
           //digitalWrite(led, HIGH);
-          if(gps.time.isValid() && gps.time.value() != 0) {
-              digitalWrite(led, HIGH);
-          } else {
-             digitalWrite(led, LOW);
-          }
+          //if(gps.time.isValid() && gps.time.value() != 0) {
+          //    digitalWrite(led, HIGH);
+          //} else {
+          //   digitalWrite(led, LOW);
+          //}
         Serial.println("Time is valid and not zero.");
         //Serial.println("test_file.log"_initialized);
-        String temp_fn;
+        //String temp_fn;
         if(!filename_initialized) { // "test_file.log" needs to be initialized
           Serial.println("In the initialization loop");
           //temp_fn = get_filename_string(gps);
           //Serial.println(temp_fn);
           //filename = (char *)malloc(sizeof(char)*(temp_fn.length() + 1));
           //temp_fn.toCharArray(filename,256);
-          //filename_initialized = 1;
+          set_filename(gps,filename,40);
+          filename_initialized = 1;
+          /*
+          if(write_gpx) {
+           start_gpx_file(); 
+           start_gpx_track();
+           start_gpx_segment();
+          }
+          */
+          Serial.println("Exiting form the initialization loop");
         }
         //Serial.println(temp_fn);
-      myFile = SD.open("test.log", FILE_WRITE);
+        if(true || gps.location.isValid()) {
+           if(true || gps.location.isUpdated()) {
+             //Serial.println(filename);
+         myFile = SD.open(filename, FILE_WRITE);
   // if the file opened okay, write to it:
-  if (myFile) {
-    Serial.print("Writing to ");
+          if (myFile) {
+            Serial.print("Writing to file.");
     //myFile.println("testing 1, 2, 3.");
-    write_to_sd();
+            if(write_gpx) {
+              //write_track_point(gps.location.lat(),gps.location.lng(),gps.altitude.meters(),gps.date.year(),gps.date.month(),gps.date.day(),gps.time.hour(),gps.time.minute(),gps.time.second());
+            } else {
+              write_to_sd();
+            }
     //myFile.println(displayInfo());
     // close the file:
-    Serial.println("done.");
-    myFile.close();
-  } else {
+            Serial.println("done.");
+            myFile.close();
+        } else {
     // if the file didn't open, print an error:
-    Serial.println("error opening ");
-  }
+          Serial.println("error opening ");
+        }
+           } else {
+            Serial.println("Coordinates need not be updated."); 
+           }
+        } else {
+         Serial.println("Location not valid");
+         //Serial.println("WTF");
+        }
+        
   //read_from_sd();
         }
     }
-    if (millis() > 5000 && gps.charsProcessed() < 10) {
+    if (millis() - start_time > 5000 && gps.charsProcessed() < 10) {
     Serial.println(F("No GPS detected: check wiring."));
     while(true);
     }
@@ -136,7 +164,7 @@ void loop()
 }
 
 void read_from_sd() {
-   myFile = SD.open("test.log");
+   myFile = SD.open(filename);
   if (myFile) {
           Serial.println(":");
     
@@ -156,9 +184,12 @@ void write_to_sd() {
     myFile.print(F("Location: "));
   if (gps.location.isValid())
   {
+    myFile.print(F("LAT:"));
     myFile.print(gps.location.lat(), 6);
-    myFile.print(F(","));
+    myFile.print(F(",LNG:"));
     myFile.print(gps.location.lng(), 6);
+    myFile.print(F(",ELE:"));
+    myFile.print(gps.altitude.meters(),6);
   }
   else
   {
@@ -253,6 +284,74 @@ void displayInfo()
   Serial.println();
 }
 
-String get_filename_string(TinyGPSPlus gps) {
-  return "df.log";
+void set_filename(TinyGPSPlus gps, char * const buffer,int length) {
+  String filename = "";
+  filename = filename + gps.date.year();
+  filename = filename + "/" + gps.date.month();
+  filename = filename + "/" + gps.date.day();
+  char dir_name[27];
+  filename.toCharArray(dir_name,27);
+  SD.mkdir(dir_name);
+  filename = filename + "/" + gps.time.value() + ".DAT";
+  //filename = filename + "/" + gps.time.value();
+  Serial.println(gps.time.value());
+  Serial.println(filename);
+  if(filename.length() > length) {
+   filename = "temp";// Error! 
+  }
+  filename.toCharArray(buffer,length);
 }
+/*
+void start_gpx_file() {
+  myFile.println(F("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>"));
+  myFile.println(F("<gpx version=\"0.6\" creator=\"Nakkitracker 0.2 - nakkiservo@quakenet\">"));
+}
+
+void end_gpx_file() {
+  myFile.println(F("<\gpx>"));
+}
+
+void start_gpx_track() {
+  myFile.println(F("<trk>"));
+}
+
+void end_gpx_track() {
+  myFile.println(F("<\trk>"));
+}
+
+void start_gpx_segment() {
+  myFile.println(F("<trkseg>"));
+}
+
+void end_gpx_segment() {
+  myFile.println(F("<\trkseg>"));
+}
+
+void write_track_point(double lat,double lng,double elevation,int year,int month,int day,int hour,int min, int sec) {
+  myFile.print(F("<trkpt lat=\""));
+  myFile.print(lat,8);
+  myFile.print(F("\" lon=\""));
+  myFile.print(lng,8);
+  myFile.println(F("\">"));
+  myFile.print(F("<ele>"));
+  myFile.print(elevation,8);
+  myFile.println(F("<\ele>"));
+  myFile.print(F("<time>"));
+  myFile.print(year);
+  myFile.print(F("-"));
+  myFile.print(month);
+  myFile.print(F("-"));
+  myFile.print(day);
+  myFile.print(F("T"));
+  myFile.print(hour);
+  myFile.print(F(":"));
+  myFile.print(min);
+  myFile.print(F(":"));
+  myFile.print(sec);
+  myFile.println(F("Z<\time>"));
+  myFile.println(F("<\trkpt>"));
+}
+*/
+
+
+
