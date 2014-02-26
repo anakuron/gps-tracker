@@ -68,13 +68,13 @@ TinyGPSPlus gps;
 // The serial connection to the GPS device
 SoftwareSerial ss(RXPin, TXPin);
 
-char filename[40]; // 8/8/8/8.3\0
+char filename[41]; // 8/8/8/8.3\0
 int filename_initialized = 0;
 unsigned long start_time;
 boolean write_gpx = true;
 void setup()
 {
-  Serial.begin(115200);
+  Serial.begin(9600);
   ss.begin(GPSBaud);
 
 //  Serial.println(F("DeviceExample.ino"));
@@ -167,6 +167,65 @@ void loop()
     while(true);
     }
   }
+}
+
+void set_filename(TinyGPSPlus gps, char * const buffer,int length) {
+  String filename = "";
+  filename = filename + gps.time.value() + ".gpx";
+  Serial.println(filename);
+  //filename = filename + gps.date.year();
+  //char dir_name[28];
+  //filename.toCharArray(dir_name,27);
+  //Serial.println(filename);
+  //Serial.println(dir_name);
+  //if(!SD.exists(dir_name)) {
+    //Serial.println("directory " + filename + " not found. Creating.");
+    //SD.mkdir(dir_name);
+  //}
+  //Serial.println(filename);
+  //Serial.println(dir_name);
+  
+  //filename = filename + "/" + gps.date.month();
+  //Serial.println(filename);
+  //Serial.println(dir_name);
+  //filename.toCharArray(dir_name,27);
+  /*if(!SD.exists(dir_name)) {
+   SD.mkdir(dir_name);
+  }*/
+  //filename = filename + "/" + gps.date.day();
+  //Serial.println(filename);
+  //Serial.println(dir_name);
+    //filename.toCharArray(dir_name,27);
+  /*if(!SD.exists(dir_name)) {
+   SD.mkdir(dir_name);
+  }*/
+  
+  /*
+  char dir_name[27];
+  filename.toCharArray(dir_name,27);
+  if(!SD.exists(dir_name)) {
+    SD.mkdir(dir_name);
+  }
+  */
+  //int mkdir_success = SD.mkdir(dir_name);
+  //Serial.print("Successfully making a directory: ");
+  //Serial.println(mkdir_success);
+  //Serial.println(filename);
+  //filename = filename + "/";
+  //Serial.println(filename);
+  //filename = filename + gps.time.value();
+  //Serial.println(filename);
+  //Serial.println(filename);
+  //filename = filename + ".DAT";
+  //Serial.println(filename);
+  //filename = filename + "/" + gps.time.value() + ".DAT";
+  //filename = filename + "/" + gps.time.value();
+  //Serial.println(filename.length());
+  //if(filename.length() > length) {
+   //filename = "temp";// Error! 
+  //}
+  //Serial.println(filename);
+  filename.toCharArray(buffer,length);
 }
 
 void read_from_sd() {
@@ -290,44 +349,7 @@ void displayInfo()
   Serial.println();
 }
 
-void set_filename(TinyGPSPlus gps, char * const buffer,int length) {
-  String filename = "";
-  filename = filename + gps.date.year();
-  //filename.toCharArray(dir_name,27);
-  //SD.mkdir(dir_name);
-  filename = filename + "/" + gps.date.month();
-  filename = filename + "/" + gps.date.day();
-  
-  Serial.println(filename);
-  /*
-  char dir_name[27];
-  filename.toCharArray(dir_name,27);
-  if(!SD.exists(dir_name)) {
-    SD.mkdir(dir_name);
-  }
-  */
-  //int mkdir_success = SD.mkdir(dir_name);
-  //Serial.print("Successfully making a directory: ");
-  //Serial.println(mkdir_success);
-  Serial.println(filename);
-  filename = filename + "/";
-  Serial.println(filename);
-  filename = filename + gps.time.value();
-  Serial.println(filename);
-  filename = filename + ".DAT";
-  Serial.println(filename);
-  //filename = filename + "/" + gps.time.value() + ".DAT";
-  //filename = filename + "/" + gps.time.value();
-  Serial.println(filename.length());
-  if(filename.length() > length) {
-   filename = "temp";// Error! 
-  }
-  Serial.println(filename);
-  filename.toCharArray(buffer,length);
-  for(int i = 0; i < length; i++) {
-  //Serial.print(buffer[i]);
-  }
-}
+
 
 void start_gpx_file() {
   myFile.println(F("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>"));
