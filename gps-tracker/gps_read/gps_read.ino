@@ -72,6 +72,7 @@ char filename[41]; // 8/8/8/8.3\0
 int filename_initialized = 0;
 unsigned long start_time;
 boolean write_gpx = true;
+unsigned int nbr_coords = 0;
 void setup()
 {
   Serial.begin(9600);
@@ -143,6 +144,14 @@ void loop()
             } else {
               write_to_sd();
             }
+            nbr_coords++;
+            if(nbr_coords > 100) {
+             end_gpx_segment();
+             end_gpx_track();
+             end_gpx_file();
+             myFile.close();
+             return;
+            }
     //myFile.println(displayInfo());
     // close the file:
             Serial.println("done.");
@@ -171,8 +180,18 @@ void loop()
 
 void set_filename(TinyGPSPlus gps, char * const buffer,int length) {
   String filename = "";
-  filename = filename + gps.time.value() + ".gpx";
-  Serial.println(filename);
+  /*char dir_name[27];
+  filename = filename + "/" + gps.date.year();
+  filename = filename + "/" + gps.date.month();
+  filename = filename + "/" + gps.date.day();
+  filename.toCharArray(dir_name,filename.length()+1);
+  SD.mkdir(dir_name);
+  */
+  //if(SD.exists("/2014")) {
+    //SD.mkdir("/dir");
+  //}
+  filename = filename + "/" + gps.time.value() + ".gpx";
+  //Serial.println("Writing to file " + filename + ".");
   //filename = filename + gps.date.year();
   //char dir_name[28];
   //filename.toCharArray(dir_name,27);
@@ -357,7 +376,7 @@ void start_gpx_file() {
 }
 
 void end_gpx_file() {
-  myFile.println(F("<\\gpx>"));
+  myFile.println(F("</gpx>"));
 }
 
 void start_gpx_track() {
@@ -365,7 +384,7 @@ void start_gpx_track() {
 }
 
 void end_gpx_track() {
-  myFile.println(F("<\trk>"));
+  myFile.println(F("</trk>"));
 }
 
 void start_gpx_segment() {
@@ -373,7 +392,7 @@ void start_gpx_segment() {
 }
 
 void end_gpx_segment() {
-  myFile.println(F("<\\trkseg>"));
+  myFile.println(F("</trkseg>"));
 }
 
 void write_track_point(double lat,double lng,double elevation,int year,int month,int day,int hour,int min, int sec) {
@@ -384,7 +403,7 @@ void write_track_point(double lat,double lng,double elevation,int year,int month
   myFile.println(F("\">"));
   myFile.print(F("<ele>"));
   myFile.print(elevation,8);
-  myFile.println(F("<\\ele>"));
+  myFile.println(F("</ele>"));
   myFile.print(F("<time>"));
   myFile.print(year);
   myFile.print(F("-"));
@@ -397,8 +416,8 @@ void write_track_point(double lat,double lng,double elevation,int year,int month
   myFile.print(min);
   myFile.print(F(":"));
   myFile.print(sec);
-  myFile.println(F("Z<\\time>"));
-  myFile.println(F("<\\trkpt>"));
+  myFile.println(F("Z</time>"));
+  myFile.println(F("</trkpt>"));
 }
 
 
