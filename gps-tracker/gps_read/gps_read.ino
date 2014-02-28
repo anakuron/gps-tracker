@@ -34,10 +34,10 @@ void setup_sd()
    pinMode(10, OUTPUT);
    
   while(!SD.begin(SD_SS)) {
-    Serial.println("initialization failed!... waiting until SD card is inserted...");
+    Serial.println(F("initialization failed!... waiting until SD card is inserted..."));
     delay(5000);
   }
-  Serial.println("initialization done.");
+  Serial.println(F("initialization done."));
   
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
@@ -103,18 +103,19 @@ void loop()
           //} else {
           //   digitalWrite(led, LOW);
           //}
-        Serial.println("Time is valid and not zero.");
+        Serial.println(F("Time is valid and not zero."));
         //Serial.println("test_file.log"_initialized);
         //String temp_fn;
         if(!filename_initialized) { // "test_file.log" needs to be initialized
-          Serial.println("In the initialization loop");
+          Serial.println(F("In the initialization loop"));
           //temp_fn = get_filename_string(gps);
           //Serial.println(temp_fn);
           //filename = (char *)malloc(sizeof(char)*(temp_fn.length() + 1));
           //temp_fn.toCharArray(filename,256);
           set_filename(gps,filename,40);
           filename_initialized = 1;
-          
+          Serial.print(F("Filename = "));
+          Serial.println(filename);
           if(write_gpx) {
             myFile = SD.open(filename, FILE_WRITE);
             if(myFile) {
@@ -123,12 +124,13 @@ void loop()
            start_gpx_segment();
            myFile.close();
             } else {
-              Serial.println("Failed to open the file for writing the header.");
-              return;
+              Serial.println(F("Failed to open the file for writing the header."));
+              Serial.print(F("The filename was: "));
+              Serial.println(filename);
+              
             }
           }
-          
-          Serial.println("Exiting form the initialization loop");
+          Serial.println(F("Exiting form the initialization loop"));
         }
         //Serial.println(temp_fn);
         if(gps.location.isValid()) {
@@ -137,34 +139,40 @@ void loop()
          myFile = SD.open(filename, FILE_WRITE);
   // if the file opened okay, write to it:
           if (myFile) {
-            Serial.print("Writing to file.");
+            Serial.print(F("Writing to file."));
     //myFile.println("testing 1, 2, 3.");
             if(write_gpx) {
-              write_track_point(gps.location.lat(),gps.location.lng(),gps.altitude.meters(),gps.date.year(),gps.date.month(),gps.date.day(),gps.time.hour(),gps.time.minute(),gps.time.second());
+              write_track_point(gps.location.lat(),gps.location.lng(),gps.altitude.meters(),gps.date.year(),gps.date.month(),gps.date.day(),gps.time.hour(),gps.time.minute(),gps.time.second(),gps.satellites.value());
             } else {
               write_to_sd();
             }
             nbr_coords++;
-            if(nbr_coords > 100) {
+            Serial.print(F("Number of coords written: "));
+            Serial.println(nbr_coords);
+            if(nbr_coords > 9) {
              end_gpx_segment();
              end_gpx_track();
              end_gpx_file();
-             myFile.close();
-             return;
+             filename_initialized = 0;
+             nbr_coords = 0;
+             Serial.println(F("Closing the file."));
+     
             }
     //myFile.println(displayInfo());
     // close the file:
-            Serial.println("done.");
+            Serial.println(F("done."));
             myFile.close();
         } else {
     // if the file didn't open, print an error:
-          Serial.println("error opening ");
+          Serial.print(F("Error opening file"));
+          Serial.print(filename);
+          Serial.println(F("."));
         }
            } else {
-            Serial.println("Coordinates need not be updated."); 
+            Serial.println(F("Coordinates need not be updated.")); 
            }
         } else {
-         Serial.println("Location not valid");
+         Serial.println(F("Location not valid"));
          //Serial.println("WTF");
         }
         
@@ -180,17 +188,23 @@ void loop()
 
 void set_filename(TinyGPSPlus gps, char * const buffer,int length) {
   String filename = "";
-  /*char dir_name[27];
-  filename = filename + "/" + gps.date.year();
-  filename = filename + "/" + gps.date.month();
-  filename = filename + "/" + gps.date.day();
+  char dir_name[27];
+  filename = filename + gps.date.year();
   filename.toCharArray(dir_name,filename.length()+1);
   SD.mkdir(dir_name);
-  */
+  filename = filename + "/" + gps.date.month();
+  filename.toCharArray(dir_name,filename.length()+1);
+  SD.mkdir(dir_name);
+  filename = filename + "/" + gps.date.day() + "/";
+  filename.toCharArray(dir_name,filename.length()+1);
+  SD.mkdir(dir_name);
+  
+  //SD.mkdir("2014/2/28");
+  
   //if(SD.exists("/2014")) {
     //SD.mkdir("/dir");
   //}
-  filename = filename + "/" + gps.time.value() + ".gpx";
+  filename = filename + gps.time.value() + ".gpx";
   //Serial.println("Writing to file " + filename + ".");
   //filename = filename + gps.date.year();
   //char dir_name[28];
@@ -260,7 +274,7 @@ void read_from_sd() {
     myFile.close();
   } else {
     // if the file didn't open, print an error:
-    Serial.println("error opening ");
+    Serial.println(F("error opening "));
   } 
 }
 
@@ -395,7 +409,7 @@ void end_gpx_segment() {
   myFile.println(F("</trkseg>"));
 }
 
-void write_track_point(double lat,double lng,double elevation,int year,int month,int day,int hour,int min, int sec) {
+void write_track_point(double lat,double lng,double elevation,int year,int month,int day,int hour,int min, int sec,int num_sat) {
   myFile.print(F("<trkpt lat=\""));
   myFile.print(lat,8);
   myFile.print(F("\" lon=\""));
@@ -404,6 +418,9 @@ void write_track_point(double lat,double lng,double elevation,int year,int month
   myFile.print(F("<ele>"));
   myFile.print(elevation,8);
   myFile.println(F("</ele>"));
+  myFile.print(F("<sat>"));
+  myFile.print(num_sat);
+  myFile.print(F("</sat>"));
   myFile.print(F("<time>"));
   myFile.print(year);
   myFile.print(F("-"));
