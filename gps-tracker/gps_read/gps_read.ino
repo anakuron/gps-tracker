@@ -114,7 +114,7 @@ void loop()
       }
       displayInfo();
       //Serial.println(gps.date.value());
-        if(true || gps.date.isValid() && gps.date.value() != 0) {
+        if(gps.date.isValid() && gps.date.value() != 0) {
           //jee
           //digitalWrite(led, HIGH);
           //if(gps.time.isValid() && gps.time.value() != 0) {
