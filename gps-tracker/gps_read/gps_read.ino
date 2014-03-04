@@ -10,13 +10,17 @@
    4800-baud serial GPS device hooked up on pins 4(rx) and 3(tx).
 */
 
-static const int RXPin = 5, TXPin = 3;
-static const int SD_SS = 4;
-static const int led = 13;
+static const int RXPin = 5, TXPin = 3; // GPS RX and TX
+static const int SD_SS = 4; //For SD card
+//static const int led = 13; // Not working, probably taken by SD-card
+static const int power_button = 2; // Button for poweroff.
+volatile int power_state = LOW;
 static const uint32_t GPSBaud = 9600;
 //unsigned long time; //Will overflow in 50 days!!
 
 File myFile;
+int sd_failed_delay = 5000;
+boolean sd_initialized = false;
 
 void setup_sd()
 {
@@ -35,9 +39,11 @@ void setup_sd()
    
   while(!SD.begin(SD_SS)) {
     Serial.println(F("initialization failed!... waiting until SD card is inserted..."));
-    delay(5000);
+    delay(sd_failed_delay);
   }
+  
   Serial.println(F("initialization done."));
+  sd_initialized = true;
   
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
@@ -70,6 +76,7 @@ SoftwareSerial ss(RXPin, TXPin);
 
 char filename[41]; // 8/8/8/8.3\0
 int filename_initialized = 0;
+
 unsigned long start_time;
 boolean write_gpx = true;
 unsigned int nbr_coords = 0;
@@ -83,8 +90,10 @@ void setup()
 //  Serial.print(F("Testing TinyGPS++ library v. ")); Serial.println(TinyGPSPlus::libraryVersion());
 //  Serial.println(F("by Mikal Hart"));
 //  Serial.println();
-  pinMode(led, OUTPUT);
-  setup_sd();
+//  pinMode(led, OUTPUT);
+  pinMode(power_button,INPUT_PULLUP);
+  attachInterrupt(0,blink,CHANGE);
+  //setup_sd();
   start_time = millis();
 }
 
@@ -93,9 +102,19 @@ void loop()
   // This sketch displays information every time a new sentence is correctly encoded.
   while (ss.available() > 0) {
     if (gps.encode(ss.read())) {
+      if(!power_state) {
+       power_off();
+       while(!power_state) {
+           Serial.println(F("Power is off!")); 
+      }
+      power_on();
+      }
+      if(!sd_initialized) {
+        setup_sd();
+      }
       displayInfo();
       //Serial.println(gps.date.value());
-        if(gps.date.isValid() && gps.date.value() != 0) {
+        if(true || gps.date.isValid() && gps.date.value() != 0) {
           //jee
           //digitalWrite(led, HIGH);
           //if(gps.time.isValid() && gps.time.value() != 0) {
@@ -149,7 +168,7 @@ void loop()
             nbr_coords++;
             Serial.print(F("Number of coords written: "));
             Serial.println(nbr_coords);
-            if(nbr_coords > 9) {
+            if(nbr_coords > 99) {
              end_gpx_segment();
              end_gpx_track();
              end_gpx_file();
@@ -176,14 +195,40 @@ void loop()
          //Serial.println("WTF");
         }
         
-  //read_from_sd();
+  //read_from_sd();ng interrupt_time = millis();
         }
     }
     if (millis() - start_time > 5000 && gps.charsProcessed() < 10) {
-    Serial.println(F("No GPS detected: check wiring."));
+      Serial.println(F("No GPS detected: check wiring."));
     while(true);
     }
   }
+}
+
+void blink() {
+  static unsigned long last_interrupt_time = 0;
+  unsigned long interrupt_time = millis();
+  if(interrupt_time - last_interrupt_time > 500) { // Interrupt time 200 ms
+    last_interrupt_time = interrupt_time;
+    power_state = !power_state;
+  }
+}
+
+void power_off() {
+  if(sd_initialized && filename_initialized) {
+    end_gpx_segment();
+    end_gpx_track();
+    end_gpx_file();
+    filename_initialized = 0; // Start a new file
+     // End file
+  }
+   // stop GPS and set it to waiting state.
+   // Put arduino to ultra low power state.
+}
+
+void power_on() {
+  // Start Arduino
+  // Start GPS
 }
 
 void set_filename(TinyGPSPlus gps, char * const buffer,int length) {
