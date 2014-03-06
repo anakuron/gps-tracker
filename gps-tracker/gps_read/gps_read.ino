@@ -78,7 +78,7 @@ char filename[41]; // 8/8/8/8.3\0
 int filename_initialized = 0;
 
 unsigned long start_time;
-boolean write_gpx = true;
+//boolean write_gpx = true;
 unsigned int nbr_coords = 0;
 void setup()
 {
@@ -132,23 +132,23 @@ void loop()
           //filename = (char *)malloc(sizeof(char)*(temp_fn.length() + 1));
           //temp_fn.toCharArray(filename,256);
           set_filename(gps,filename,40);
-          filename_initialized = 1;
           Serial.print(F("Filename = "));
           Serial.println(filename);
-          if(write_gpx) {
-            myFile = SD.open(filename, FILE_WRITE);
-            if(myFile) {
+          myFile = SD.open(filename, FILE_WRITE);
+          if(myFile) {
            start_gpx_file(); 
            start_gpx_track();
            start_gpx_segment();
            myFile.close();
+           filename_initialized = 1;
             } else {
               Serial.println(F("Failed to open the file for writing the header."));
               Serial.print(F("The filename was: "));
               Serial.println(filename);
+              sd_initialized = false; // and filename is not initialized either
               
             }
-          }
+          
           Serial.println(F("Exiting form the initialization loop"));
         }
         //Serial.println(temp_fn);
@@ -159,16 +159,11 @@ void loop()
   // if the file opened okay, write to it:
           if (myFile) {
             Serial.print(F("Writing to file."));
-    //myFile.println("testing 1, 2, 3.");
-            if(write_gpx) {
               write_track_point(gps.location.lat(),gps.location.lng(),gps.altitude.meters(),gps.date.year(),gps.date.month(),gps.date.day(),gps.time.hour(),gps.time.minute(),gps.time.second(),gps.satellites.value());
-            } else {
-              write_to_sd();
-            }
             nbr_coords++;
             Serial.print(F("Number of coords written: "));
             Serial.println(nbr_coords);
-            if(nbr_coords > 99) {
+            /*if(nbr_coords > 99) {
              end_gpx_segment();
              end_gpx_track();
              end_gpx_file();
@@ -177,6 +172,7 @@ void loop()
              Serial.println(F("Closing the file."));
      
             }
+            */
     //myFile.println(displayInfo());
     // close the file:
             Serial.println(F("done."));
@@ -186,6 +182,7 @@ void loop()
           Serial.print(F("Error opening file"));
           Serial.print(filename);
           Serial.println(F("."));
+          sd_initialized = false;
         }
            } else {
             Serial.println(F("Coordinates need not be updated.")); 
@@ -216,10 +213,16 @@ void blink() {
 
 void power_off() {
   if(sd_initialized && filename_initialized) {
-    end_gpx_segment();
-    end_gpx_track();
-    end_gpx_file();
-    filename_initialized = 0; // Start a new file
+    myFile = SD.open(filename, FILE_WRITE);
+    if(myFile) {
+      end_gpx_segment();
+      end_gpx_track();
+      end_gpx_file();
+      myFile.close();
+      filename_initialized = 0; // Start a new file
+    } else {
+     sd_initialized = false; 
+    }
      // End file
   }
    // stop GPS and set it to waiting state.
