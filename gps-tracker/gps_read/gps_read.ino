@@ -14,13 +14,18 @@ static const int RXPin = 5, TXPin = 3; // GPS RX and TX
 static const int SD_SS = 4; //For SD card
 //static const int led = 13; // Not working, probably taken by SD-card
 static const int power_button = 2; // Button for poweroff.
-volatile int power_state = LOW;
+static const int led_r = 7;
+static const int led_y = 8;
+static const int led_g = 9;
+volatile int power_state = HIGH;
 static const uint32_t GPSBaud = 9600;
 //unsigned long time; //Will overflow in 50 days!!
 
 File myFile;
 int sd_failed_delay = 5000;
 boolean sd_initialized = false;
+
+void(* resetFunc) (void) = 0;
 
 void setup_sd()
 {
@@ -39,6 +44,7 @@ void setup_sd()
    
   while(!SD.begin(SD_SS)) {
     Serial.println(F("initialization failed!... waiting until SD card is inserted..."));
+    light_up(led_r);
     delay(sd_failed_delay);
   }
   
@@ -92,22 +98,30 @@ void setup()
 //  Serial.println();
 //  pinMode(led, OUTPUT);
   pinMode(power_button,INPUT_PULLUP);
-  attachInterrupt(0,blink,CHANGE);
+  pinMode(led_r,OUTPUT);
+  pinMode(led_y,OUTPUT);
+  pinMode(led_g,OUTPUT);
+  
+  attachInterrupt(0,state_change,CHANGE);
   //setup_sd();
   start_time = millis();
+  light_up(led_y);
 }
 
 void loop()
 {
   // This sketch displays information every time a new sentence is correctly encoded.
+  
   while (ss.available() > 0) {
     if (gps.encode(ss.read())) {
       if(!power_state) {
        power_off();
+       light_up(led_r);
        while(!power_state) {
            Serial.println(F("Power is off!")); 
       }
       power_on();
+      light_up(led_y);
       }
       if(!sd_initialized) {
         setup_sd();
@@ -146,13 +160,14 @@ void loop()
               Serial.print(F("The filename was: "));
               Serial.println(filename);
               sd_initialized = false; // and filename is not initialized either
-              
+              // TODO restart
             }
           
           Serial.println(F("Exiting form the initialization loop"));
         }
         //Serial.println(temp_fn);
         if(gps.location.isValid()) {
+          light_up(led_g);
            if(true || gps.location.isUpdated()) {
              //Serial.println(filename);
          myFile = SD.open(filename, FILE_WRITE);
@@ -183,6 +198,7 @@ void loop()
           Serial.print(filename);
           Serial.println(F("."));
           sd_initialized = false;
+          //TODO restart
         }
            } else {
             Serial.println(F("Coordinates need not be updated.")); 
@@ -202,13 +218,20 @@ void loop()
   }
 }
 
-void blink() {
+void state_change() {
   static unsigned long last_interrupt_time = 0;
   unsigned long interrupt_time = millis();
   if(interrupt_time - last_interrupt_time > 500) { // Interrupt time 200 ms
     last_interrupt_time = interrupt_time;
     power_state = !power_state;
   }
+}
+
+void light_up(const int led) {
+  digitalWrite(led_r,LOW);
+  digitalWrite(led_g,LOW);
+  digitalWrite(led_y,LOW);
+  digitalWrite(led,HIGH);
 }
 
 void power_off() {
@@ -221,7 +244,8 @@ void power_off() {
       myFile.close();
       filename_initialized = 0; // Start a new file
     } else {
-     sd_initialized = false; 
+     sd_initialized = false;
+     //TODO no need to restart. The file will not be finished, but if the SD card is missing, can restart will be issued when power on is called.
     }
      // End file
   }
@@ -483,6 +507,63 @@ void write_track_point(double lat,double lng,double elevation,int year,int month
   myFile.print(sec);
   myFile.println(F("Z</time>"));
   myFile.println(F("</trkpt>"));
+}
+
+/*
+  Set the gps output interval in seconds (0-255). 0 means no output
+*/
+
+void set_output_rate(unsigned char output_rate) {
+  Serial.print(F("$PSRF103,00,00,00,01*24")); //GGA
+  Serial.write(0x0D);
+  Serial.write(0x0A);
+  delay(10);
+  Serial.print(F("$PSRF103,01,00,00,01*25")); //GLL
+  Serial.write(0x0D);
+  Serial.write(0x0A);
+  delay(10);
+  Serial.print(F("$PSRF103,02,00,00,01*26")); //GSA
+  Serial.write(0x0D);
+  Serial.write(0x0A);
+  delay(10);
+  Serial.print(F("$PSRF103,03,00,00,01*27")); //GSV
+  Serial.write(0x0D);
+  Serial.write(0x0A);
+  delay(10);
+  Serial.print(F("$PSRF103,04,00,00,01*20")); //RMC
+  Serial.write(0x0D);
+  Serial.write(0x0A);
+  delay(10);
+  Serial.print(F("$PSRF103,05,00,00,01*21")); //VTG
+  Serial.write(0x0D);
+  Serial.write(0x0A);
+  delay(10);
+  Serial.print(F("$PSRF103,06,00,00,01*22")); //MSS
+  Serial.write(0x0D);
+  Serial.write(0x0A);
+  delay(10);
+  Serial.print(F("$PSRF103,07,00,00,01*23")); ///////ZDA
+  Serial.write(0x0D);
+  Serial.write(0x0A);
+    delay(10);
+    
+  /////////////////////////////////////////ZDA
+
+ Serial.print(F("$PSRF103,07,00,"));
+ Serial.print(output_rate);
+ Serial.print(F(",01*22"));
+ Serial.write(0x0D);
+ Serial.write(0x0A);
+ delay(10); 
+
+////////////////////////////////////// GGA
+
+ Serial.print(F("$PSRF103,00,00,"));
+ Serial.print(output_rate);
+ Serial.print(F(",01*25"));
+ Serial.write(0x0D);
+ Serial.write(0x0A);
+ delay(10);
 }
 
 
